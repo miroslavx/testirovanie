@@ -3,8 +3,6 @@ import uuid, time, re
 
 app = Flask(__name__)
 
-# --- Хранилища данных в памяти ---
-
 USERS = {
     "alice@example.com": { "password": "pass123", "role": "user"},
     "admin@example.com": {"password":"admin123","role": "admin"}
@@ -13,17 +11,12 @@ USERS = {
 TOKENS = {}
 
 ORDERS = {}
-
-# --- Вспомогательные функции ---
-
 def require_bearer(req):
     auth = req.headers.get("Authorization","")
     if not auth.startswith("Bearer "):
         return None
     token = auth.split(" ",1)[1].strip()
     return TOKENS.get(token)
-
-# --- Эндпоинты ---
 
 @app.get("/health")
 def health():
@@ -34,16 +27,12 @@ def register():
     data = request.get_json() or {}
     email = data.get("email")
     password = data.get("password")
-
-    # Валидация
     if not email or "@" not in email:
         return jsonify({"error": "Email is required and must be valid"}), 400
     if not password or len(password) < 6:
         return jsonify({"error": "Password is required and must be at least 6 characters long"}), 400
     if email in USERS:
         return jsonify({"error": "Email already registered"}), 409
-
-    # Создание пользователя и токена
     USERS[email] = {"password": password, "role": "user"}
     tok = str(uuid.uuid4())
     TOKENS[tok] = {'email': email, 'role': 'user'}
@@ -106,16 +95,10 @@ def change_password():
         return jsonify({"error": "New password must be at least 6 characters long"}), 400
     if old_password == new_password:
         return jsonify({"error": "New password cannot be the same as the old one"}), 400
-
-    # Обновление пароля и ротация токена
     user['password'] = new_password
-    
-    # Удаляем старый токен
     old_token = request.headers.get("Authorization").split(" ", 1)[1].strip()
     if old_token in TOKENS:
         del TOKENS[old_token]
-
-    # Создаем новый токен
     new_token_str = str(uuid.uuid4())
     TOKENS[new_token_str] = {'email': email, 'role': user['role']}
     
@@ -141,8 +124,6 @@ def create_order():
     data = request.get_json() or {}
     item_id = data.get("item_id")
     qty = data.get("qty")
-
-    # Валидация
     if not item_id:
         return jsonify({"error": "item_id is required"}), 400
     if not isinstance(qty, int) or not (1 <= qty <= 10):
@@ -196,7 +177,7 @@ def get_order_by_id(order_id):
     if not order:
         return jsonify({"error": "Not Found"}), 404
 
-    # Авторизация: владелец или админ
+    # владелец или админ
     if order["owner"] != principal["email"] and principal["role"] != "admin":
         return jsonify({"error": "forbidden"}), 403
         
@@ -204,4 +185,5 @@ def get_order_by_id(order_id):
 
 
 if __name__ == "__main__":
+
     app.run(host="127.0.0.1", port=5000)
